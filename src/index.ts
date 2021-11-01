@@ -18,29 +18,9 @@ interface InitOpts {
 	max?: number
 }
 
-export async function init<KoaApp extends Koa>(app: KoaApp, { url, max }: InitOpts) {
-	const params = parse(url)
-	const [user, password] = (params.auth || '').split(':')
-	const dbConfig = {
-		user,
-		password,
-		host: params.hostname || undefined,
-		port: +(params.port || 5432),
-		database: (params.pathname || '').split('/')[1],
-		max
-	}
-	app.context.pgPool = new PG.Pool(dbConfig)
-	app.context.pgPool.on('connect', function onConnect(conn: PG.Client) {
-		conn.on('error', console.error)
-		conn.on('notice', function onNotice(notice) {
-			console.log('NOTICE', notice.message)
-		})
-	})
-}
-
 export class DB {
-	pg: PG.Client
-	constructor(pg: PG.Client) {
+	pg: PG.ClientBase
+	constructor(pg: PG.ClientBase) {
 		this.pg = pg
 	}
 
@@ -60,7 +40,7 @@ export class DB {
 		return this.pg.query('ROLLBACK')
 	}
 
-	async exec(query: string, args: any[] = []) {
+	async exec(query: string, args: unknown[] = []) {
 		const t = Date.now()
 		try {
 			if (!query.match(/^!/)) console.log('Q: ' + query, args || '')
@@ -80,7 +60,7 @@ export class DB {
 		}
 	}
 
-	async proc(query: string, args:any[] = []) {
+	async proc(query: string, args: unknown[] = []) {
 		const t = Date.now()
 		try {
 			if (!query.match(/^!/)) console.log('P: ' + query, args || '')
@@ -98,7 +78,7 @@ export class DB {
 		}
 	}
 
-	async func(query: string, args:any[] = []) {
+	async func(query: string, args: unknown[] = []) {
 		const t = Date.now()
 		try {
 			if (!query.match(/^!/)) console.log('F: ' + query, args || '')
@@ -117,7 +97,7 @@ export class DB {
 		}
 	}
 
-	async map(query: string, key: string, args: any[] = []) {
+	async map(query: string, key: string, args: unknown[] = []) {
 		const t = Date.now()
 		try {
 			if (!query.match(/^!/)) console.log('Q: ' + query, args || '')
@@ -225,8 +205,14 @@ export class DB {
 	}
 }
 
+export interface Context extends Koa.Context {
+	pgPool: PG.Pool
+	db: DB
+}
+
 // Koa middleware to access DB Pool
-export async function pgMiddleware<Context extends Koa.Context & { db?: DB }, Next extends Koa.Next>(ctx: Context, next: Next) {
+//export async function pgMiddleware<Context extends Koa.Context & { db?: DB }, Next extends Koa.Next>(ctx: Context, next: Next) {
+export async function pgMiddleware<CTX extends Context, Next extends Koa.Next>(ctx: CTX, next: Next) {
 	if (ctx.db) return next()
 
 	let pg = await ctx.pgPool.connect()
@@ -239,7 +225,27 @@ export async function pgMiddleware<Context extends Koa.Context & { db?: DB }, Ne
 		pg.release()
 		throw err
 	}
-	delete ctx.db
+	delete (ctx as any).db
+}
+
+export async function init(app: Koa<Koa.DefaultState, Context>, { url, max }: InitOpts) {
+	const params = parse(url)
+	const [user, password] = (params.auth || '').split(':')
+	const dbConfig = {
+		user,
+		password,
+		host: params.hostname || undefined,
+		port: +(params.port || 5432),
+		database: (params.pathname || '').split('/')[1],
+		max
+	}
+	app.context.pgPool = new PG.Pool(dbConfig)
+	app.context.pgPool.on('connect', function onConnect(conn: PG.ClientBase) {
+		conn.on('error', console.error)
+		conn.on('notice', function onNotice(notice) {
+			console.log('NOTICE', notice.message)
+		})
+	})
 }
 
 // vim: ts=4
