@@ -228,7 +228,7 @@ export async function pgMiddleware<CTX extends Context, Next extends Koa.Next>(c
 	delete (ctx as any).db
 }
 
-export async function init(app: Koa<Koa.DefaultState, Context>, { url, max }: InitOpts) {
+export async function init<ST extends Koa.DefaultState, CTX extends Context>(app: Koa<ST, CTX>, { url, max }: InitOpts) {
 	const params = parse(url)
 	const [user, password] = (params.auth || '').split(':')
 	const dbConfig = {
