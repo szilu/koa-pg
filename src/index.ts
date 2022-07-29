@@ -25,7 +25,15 @@ export class DB {
 	}
 
 	transformResult(res: PG.QueryResult) {
-		for (const row of res.rows) for (const key in row) if (row[key] == null) delete row[key]
+		for (const row of res.rows) {
+			for (const key in row) {
+				if (row[key] == null) {
+					delete row[key]
+				} else if (typeof row[key] == 'string') {
+					row[key] = row[key].trim()
+				}
+			}
+		}
 	}
 
 	begin() {
