@@ -1,5 +1,5 @@
 import * as PG from 'pg'
-import { ident, literal } from 'node-pg-format'
+import { quoteIdent, quoteLiteral } from 'node-pg-format'
 import * as Koa from 'koa'
 import { parse } from 'url'
 import * as T from '@symbion/runtype'
@@ -9,13 +9,18 @@ import { ServerError } from './utils'
 // Utility functions
 function ql(v?: unknown) {
 	return v === null ? 'NULL'
-		: Array.isArray(v) ? literal('' + v).replace(/^'(.*)'$/, (match, p1) => `'{${p1}}'`)
-		: literal('' + v)
+		: Array.isArray(v) ? quoteLiteral('' + v).replace(/^'(.*)'$/, (match, p1) => `'{${p1}}'`)
+		: quoteLiteral('' + v)
 }
 
 interface InitOpts {
 	url: string
 	max?: number
+}
+
+interface QueryOpts {
+	includeNulls?: boolean
+	noTrimStrings?: boolean
 }
 
 export class DB {
@@ -141,9 +146,9 @@ export class DB {
 			})
 			const keys = schema.keys.filter(f => data[f] != null)
 
-			const query = `INSERT INTO ${table} (${[...keys, ...flds].map(f => ident((schema.props[f] as any)?.dbName || f)).join(', ')}) `
+			const query = `INSERT INTO ${table} (${[...keys, ...flds].map(f => quoteIdent((schema.props[f] as any)?.dbName || f)).join(', ')}) `
 				+ `VALUES (${[...keys, ...flds].map(f => ql(data[f])).join(', ')}) `
-				+ 'RETURNING ' + [...keys, ...flds].map(f => ident((schema.props[f] as any)?.dbName || f)).join(', ')
+				+ 'RETURNING ' + [...keys, ...flds].map(f => quoteIdent((schema.props[f] as any)?.dbName || f)).join(', ')
 			console.log('Query', query)
 			let res = await this.pg.query(query, [])
 			return res.rows[0]
@@ -166,11 +171,11 @@ export class DB {
 			const keys = schema.keys
 			if (keys.length < 1) throw new Error('Key missing in schema definition')
 
-			const query = `INSERT INTO ${table} (${[...keys, ...flds].map(f => ident((schema.props[f] as any)?.dbName || f)).join(', ')}) `
+			const query = `INSERT INTO ${table} (${[...keys, ...flds].map(f => quoteIdent((schema.props[f] as any)?.dbName || f)).join(', ')}) `
 				+ `VALUES (${[...keys, ...flds].map(f => ql(data[f])).join(', ')}) `
 				+ `ON CONFLICT (${keys.join(',')}) DO `
-				+ `UPDATE SET ${flds.map(f => ident((schema.props[f] as any)?.dbName || f) + '=' + ql(data[f])).join(', ')}`
-				+ 'RETURNING ' + flds.map(f => ident((schema.props[f] as any)?.dbName || f)).join(', ')
+				+ `UPDATE SET ${flds.map(f => quoteIdent((schema.props[f] as any)?.dbName || f) + '=' + ql(data[f])).join(', ')}`
+				+ 'RETURNING ' + flds.map(f => quoteIdent((schema.props[f] as any)?.dbName || f)).join(', ')
 			console.log('Query', query)
 			let res = await this.pg.query(query, [])
 			return res.rows[0]
@@ -194,10 +199,10 @@ export class DB {
 			if (keys.length < 1) throw new Error('Key missing in schema definition')
 
 			const query = `UPDATE ${table} SET `
-				+ flds.map(f => ident((schema.props[f] as any)?.dbName || f) + '=' + ql(data[f])).join(', ')
+				+ flds.map(f => quoteIdent((schema.props[f] as any)?.dbName || f) + '=' + ql(data[f])).join(', ')
 				+ ' WHERE '
-				+ keys.map(f => ident((schema.props[f] as any)?.dbName || f) + (data[f] === null ? 'ISNULL' : '=' + ql(data[f]))).join(' AND ')
-				+ ' RETURNING ' + flds.map(f => ident((schema.props[f] as any)?.dbName || f)).join(', ')
+				+ keys.map(f => quoteIdent((schema.props[f] as any)?.dbName || f) + (data[f] === null ? 'ISNULL' : '=' + ql(data[f]))).join(' AND ')
+				+ ' RETURNING ' + flds.map(f => quoteIdent((schema.props[f] as any)?.dbName || f)).join(', ')
 			console.log('Query', query)
 			let res = await this.pg.query(query, [])
 			console.log(res.rows[0])

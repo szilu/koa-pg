@@ -1,6 +1,6 @@
 {
   "name": "@symbion/koa-pg",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "PG utility class and Koa middleware",
   "main": "lib/index.js",
   "module": "esm/index.js",
@@ -30,15 +30,16 @@
   "author": "Szilárd Hajba <szilu@symbion.hu>",
   "license": "MIT",
   "dependencies": {
-    "@symbion/runtype": "^0.3.0",
+    "@symbion/runtype": "^0.5.0",
+    "@types/node": "^18.11.19",
     "koa": "^2.13.4",
-    "node-pg-format": "^1.2.8",
-    "pg": "^8.7.1"
+    "node-pg-format": "^1.3.5",
+    "pg": "^8.7.3"
   },
   "devDependencies": {
-    "@types/koa": "^2.13.4",
-    "@types/pg": "^8.6.1",
-    "rimraf": "^3.0.2",
-    "typescript": "^4.4.4"
+    "@types/koa": "^2.13.5",
+    "@types/pg": "^8.6.5",
+    "rimraf": "^4.1.2",
+    "typescript": "^4.7.4"
   }
 }
