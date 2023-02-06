@@ -29,12 +29,12 @@ export class DB {
 		this.pg = pg
 	}
 
-	transformResult(res: PG.QueryResult) {
+	transformResult(res: PG.QueryResult, opts: QueryOpts = {}) {
 		for (const row of res.rows) {
 			for (const key in row) {
-				if (row[key] == null) {
+				if (row[key] == null && !opts.includeNulls) {
 					delete row[key]
-				} else if (typeof row[key] == 'string') {
+				} else if (typeof row[key] == 'string' && !opts.noTrimStrings) {
 					row[key] = row[key].trim()
 				}
 			}
@@ -53,12 +53,12 @@ export class DB {
 		return this.pg.query('ROLLBACK')
 	}
 
-	async exec(query: string, args: unknown[] = []) {
+	async exec(query: string, args: unknown[] = [], opts: QueryOpts = {}) {
 		const t = Date.now()
 		try {
 			if (!query.match(/^!/)) console.log('Q: ' + query, args || '')
 			const res = await this.pg.query(query.replace(/^!/, ''), args)
-			this.transformResult(res)
+			this.transformResult(res, opts)
 			if (!query.match(/^!/)) console.log(`R: ${res.rows.length} rows ${Date.now() - t} ms`)
 			return res
 		} catch (err) {
