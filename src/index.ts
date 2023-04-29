@@ -4,7 +4,7 @@ import * as Koa from 'koa'
 import { parse } from 'url'
 import * as T from '@symbion/runtype'
 
-import { ServerError } from './utils'
+import { ServerError } from './utils.js'
 
 // Utility functions
 function ql(v?: unknown) {
