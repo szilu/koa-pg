@@ -7,7 +7,7 @@ import * as T from '@symbion/runtype'
 import { ServerError } from './utils.js'
 
 // Utility functions
-function ql(v?: unknown) {
+export function ql(v?: unknown) {
 	return v === null ? 'NULL'
 		: Array.isArray(v) ? quoteLiteral('' + v).replace(/^'(.*)'$/, (match, p1) => `'{${p1}}'`)
 		: quoteLiteral('' + v)
@@ -53,49 +53,74 @@ export class DB {
 		return this.pg.query('ROLLBACK')
 	}
 
-	async exec(query: string, args: unknown[] = [], opts: QueryOpts = {}) {
+	async exec<T extends PG.QueryResultRow = any>(query: string, args: unknown[] = [], opts: QueryOpts = {}): Promise<PG.QueryResult<T>> {
 		const t = Date.now()
+		const q = query.replace(/^!/, '').replace(/\n[\t ]*/g, '\n\t')
 		try {
-			if (!query.match(/^!/)) console.log('Q: ' + query, args || '')
-			const res = await this.pg.query(query.replace(/^!/, ''), args)
+			if (!query.match(/^!/)) console.log('Q: ' + q, args || '')
+			const res = await this.pg.query(q, args)
 			this.transformResult(res, opts)
 			if (!query.match(/^!/)) console.log(`R: ${res.rows.length} rows ${Date.now() - t} ms`)
-			return res
+			return res as PG.QueryResult<T>
 		} catch (err) {
 			if (err instanceof Error) {
 				const e = err.toString()
 				console.log('DB:EXEC ERROR', e)
 				const [_, code, descr] = e.match(/^[^@]*@([A-Z0-9-]+) *(.*)$/) || []
-				console.log('E: ' + query, args || '')
+				console.log('E: ' + q, args || '')
 				if (code) throw new ServerError(code, descr)
 				else throw new Error(e)
-			}
+			} else throw err
+		}
+	}
+
+	async get<T = any>(query: string, args: unknown[] = [], opts: QueryOpts = {}): Promise<T | undefined> {
+		const t = Date.now()
+		const q = query.replace(/^!/, '').replace(/\n[\t ]*/g, '\n\t')
+		try {
+			if (!query.match(/^!/)) console.log('Q: ' + q, args || '')
+			const res = await this.pg.query(q, args)
+			this.transformResult(res, opts)
+			if (!query.match(/^!/)) console.log(`R: ${res.rows.length} rows ${Date.now() - t} ms`)
+			if (res.rows.length > 1) throw new Error('Internal error: db.get() result')
+			return res.rows[0] as T | undefined
+		} catch (err) {
+			if (err instanceof Error) {
+				const e = err.toString()
+				console.log('DB:EXEC ERROR', e)
+				const [_, code, descr] = e.match(/^[^@]*@([A-Z0-9-]+) *(.*)$/) || []
+				console.log('E: ' + q, args || '')
+				if (code) throw new ServerError(code, descr)
+				else throw new Error(e)
+			} else throw err
 		}
 	}
 
 	async proc(query: string, args: unknown[] = []) {
 		const t = Date.now()
+		const q = query.replace(/^!/, '').replace(/\n[\t ]*/g, '\n\t')
 		try {
-			if (!query.match(/^!/)) console.log('P: ' + query, args || '')
-			let res = await this.pg.query(query.replace(/^!/, ''), args)
+			if (!query.match(/^!/)) console.log('P: ' + q, args || '')
+			const res = await this.pg.query(q, args)
 			if (!query.match(/^!/)) console.log(`R: ${res.rowCount} rows ${Date.now() - t} ms`)
 			return res.rowCount
 		} catch (err) {
 			if (err instanceof Error) {
 				const e = err.toString()
 				const [_, code, descr] = e.match(/^[^@]*@([A-Z0-9-]+) *(.*)$/) || []
-				console.log('E: ' + query, args || '')
+				console.log('E: ' + q, args || '')
 				if (code) throw new ServerError(code, descr)
 				else throw new Error(e)
-			}
+			} else throw err
 		}
 	}
 
-	async func(query: string, args: unknown[] = []) {
+	async func<T = any>(query: string, args: unknown[] = []): Promise<T> {
 		const t = Date.now()
+		const q = query.replace(/^!/, '').replace(/\n[\t ]*/g, '\n\t')
 		try {
-			if (!query.match(/^!/)) console.log('F: ' + query, args || '')
-			let res = await this.pg.query({text: query.replace(/^!/, ''), values: args, rowMode: 'array'})
+			if (!query.match(/^!/)) console.log('F: ' + q, args || '')
+			const res = await this.pg.query({text: q, values: args, rowMode: 'array'})
 			if (!query.match(/^!/)) console.log(`R: ${res.rows[0][0]} ${Date.now() - t} ms`)
 			if (res.rows.length != 1 || res.rows[0].length != 1) throw new Error('Internal error: db.func() result')
 			return res.rows[0][0]
@@ -103,18 +128,19 @@ export class DB {
 			if (err instanceof Error) {
 				const e = err.toString()
 				const [_, code, descr] = e.match(/^[^@]*@([A-Z0-9-]+) *(.*)$/) || []
-				console.log('E: ' + query, args || '')
+				console.log('E: ' + q, args || '')
 				if (code) throw new ServerError(code, descr)
 				else throw new Error(e)
-			}
+			} else throw err
 		}
 	}
 
 	async map(query: string, key: string, args: unknown[] = []) {
 		const t = Date.now()
+		const q = query.replace(/^!/, '').replace(/\n[\t ]*/g, '\n\t')
 		try {
-			if (!query.match(/^!/)) console.log('Q: ' + query, args || '')
-			const res = await this.pg.query(query.replace(/^!/, ''), args)
+			if (!query.match(/^!/)) console.log('Q: ' + q, args || '')
+			const res = await this.pg.query(q, args)
 			this.transformResult(res)
 			if (!query.match(/^!/)) console.log(`R: ${res.rows.length} rows ${Date.now() - t} ms`)
 			const ret = res.rows.reduce((acc, item) => {
@@ -127,10 +153,10 @@ export class DB {
 				const e = err.toString()
 				console.log('DB:MAP ERROR', e)
 				const [_, code, descr] = e.match(/^[^@]*@([A-Z0-9-]+) *(.*)$/) || []
-				console.log('E: ' + query, args || '')
+				console.log('E: ' + q, args || '')
 				if (code) throw new ServerError(code, descr)
 				else throw new Error(e)
-			}
+			} else throw err
 		}
 	}
 
